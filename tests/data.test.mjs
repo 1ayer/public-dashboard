@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { gunzipSync } from "node:zlib";
 
 const EXPECTED_TOTAL = 7_255;
-const EXPECTED_MAP_VALID = 7_249;
+const EXPECTED_MAP_VALID = 7_240;
 const MAX_REPORTED_ERRORS = 40;
 
 const ALLOWED_CATEGORIES = new Set([

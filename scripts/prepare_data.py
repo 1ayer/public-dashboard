@@ -54,6 +54,14 @@ REGION_COORDINATE_BOUNDS = {
     "경상남도": (34.4, 36.0, 127.3, 129.7),
 }
 
+# Two additional repeated-place patterns are contradicted by a matching row or
+# a newer record at the same place and address. Raw coordinates stay in the
+# record; only map display is disabled.
+KNOWN_COORDINATE_OUTLIERS = {
+    ("가야진사공원", 35.668489, 128.902782),
+    ("화도체육문화센터", 37.605294, 127.301414),
+}
+
 
 def clean_text(value: str | None) -> str:
     return unicodedata.normalize("NFKC", value or "").strip()
@@ -243,7 +251,9 @@ def main() -> None:
         latitude = parse_number(row.get("위도", ""))
         longitude = parse_number(row.get("경도", ""))
         region = region_of(row)
-        map_valid = coordinates_valid(region, latitude, longitude)
+        map_valid = coordinates_valid(region, latitude, longitude) and (
+            place, latitude, longitude
+        ) not in KNOWN_COORDINATE_OUTLIERS
         weekend_state = weekend_status(weekend_start, weekend_end, closed)
         base_values: dict[str, object] = {
             "address": (row.get("소재지도로명주소") or row.get("소재지지번주소") or "").strip(),
