@@ -5,10 +5,12 @@ from __future__ import annotations
 
 import csv
 import gzip
+import hashlib
 import json
 import re
 import statistics
 import sys
+import unicodedata
 from collections import Counter
 from pathlib import Path
 
@@ -31,9 +33,27 @@ CATEGORY_ORDER = [
     "다목적공간", "야외·휴양", "기타",
 ]
 
+CHANNEL_ORDER = [
+    "온라인", "전화", "방문", "팩스", "상시개방", "서면·공문",
+    "이메일", "모바일", "키오스크", "추첨", "기타 문의",
+]
+
+CATEGORY_PATTERNS = [
+    ("회의·교육", r"회의|강의|교육|세미나|교실|연수|열람실|학습"),
+    ("문화·행사", r"강당|공연|전시|영화|문화회관|소극장|극장|아트홀|예술회관|서원|무대|예술"),
+    ("실내체육", r"체육관|배드민턴|농구|배구|탁구|헬스|수영|볼링|스쿼시|당구|생활체조|체력단련|에어로빅|역도|무예|요가"),
+    ("구기·라켓", r"축구|풋살|야구|테니스|족구|골프|게이트볼|국궁|궁도|론볼|씨름|경기장|스케이트|트랙|X-GAME|라켓"),
+    ("야외·휴양", r"캠핑|야영|휴양림|운동장|공원|놀이터|광장|관광지|야외|잔디|산림"),
+    ("다목적공간", r"다목적|공유|동아리|사랑방|레크레이션|요리스튜디오|주민공간|커뮤니티"),
+]
+
+
+def clean_text(value: str | None) -> str:
+    return unicodedata.normalize("NFKC", value or "").strip()
+
 
 def parse_number(value: str) -> float | None:
-    cleaned = (value or "").replace(",", "").strip()
+    cleaned = clean_text(value).replace(",", "")
     if not cleaned:
         return None
     try:
@@ -48,21 +68,117 @@ def region_of(row: dict[str, str]) -> str:
     return REGION_ALIASES.get(first, first)
 
 
-def category_of(raw_type: str) -> str:
-    text = raw_type.replace(" ", "")
-    if re.search(r"회의|강의|교육|세미나", text):
-        return "회의·교육"
-    if re.search(r"강당|공연|전시|영화|문화회관|소극장|서원", text):
-        return "문화·행사"
-    if re.search(r"체육관|배드민턴|배드맨턴|농구|배구|탁구|헬스|수영|볼링|스쿼시|당구|생활체조", text):
-        return "실내체육"
-    if re.search(r"축구|풋살|야구|테니스|족구|골프|게이트볼|국궁|론볼|씨름", text):
-        return "구기·라켓"
-    if re.search(r"다목적|공유|동아리|광장|사랑방|레크레이션", text):
-        return "다목적공간"
-    if re.search(r"캠핑|휴양림|운동장", text):
-        return "야외·휴양"
+def normalize_type(raw_type: str) -> str:
+    return raw_type.replace("배드맨턴", "배드민턴").replace("풋살경기장", "풋살장")
+
+
+def classify_text(text: str) -> str:
+    compact = text.replace(" ", "")
+    for category, pattern in CATEGORY_PATTERNS:
+        if re.search(pattern, compact):
+            return category
     return "기타"
+
+
+def category_of(raw_type: str, context: str) -> tuple[str, str]:
+    normalized = normalize_type(raw_type)
+    direct = classify_text(normalized)
+    if direct != "기타":
+        return direct, "원자료"
+    inferred = classify_text(context)
+    if inferred != "기타":
+        return inferred, "시설명·부대정보 추정"
+    return "기타", "원자료"
+
+
+def application_channels(application: str) -> list[str]:
+    channels: list[str] = []
+    patterns = [
+        ("온라인", r"인터넷|온라인|홈페이지|예약시스템|공공서비스예약|공유누리|통합예약|웹"),
+        ("전화", r"전화|유선"),
+        ("방문", r"방문|현장|선착순|일일입장|이용권|매표"),
+        ("팩스", r"FAX|팩스"),
+        ("상시개방", r"상시개방|자유이용|자유 이용|자율이용|예약 없이|무료개방"),
+        ("서면·공문", r"신청서|공문|서면|우편"),
+        ("이메일", r"이메일|E-mail|전자우편"),
+        ("모바일", r"모바일|카카오톡|앱"),
+        ("키오스크", r"kiosk|키오스크"),
+        ("추첨", r"추첨|추첨제"),
+    ]
+    for label, pattern in patterns:
+        if re.search(pattern, application, flags=re.IGNORECASE):
+            channels.append(label)
+    if application and not channels:
+        channels.append("기타 문의")
+    return channels
+
+
+def weekend_status(start: str, end: str, closed: str) -> str:
+    if "연중무휴" in closed:
+        return "주말 운영" if (start, end) != ("00:00", "00:00") else "확인 필요"
+    saturday_closed = bool(re.search(r"(?:^|[+,/\s])토(?:요일)?(?:$|[+,/\s])", closed))
+    sunday_closed = bool(re.search(r"(?:^|[+,/\s])일(?:요일)?(?:$|[+,/\s])", closed))
+    weekend_closed = "주말" in closed
+    zero_time = (start, end) == ("00:00", "00:00")
+    valid_time = bool(start and end and not zero_time and start != end)
+    if zero_time:
+        return "휴무" if weekend_closed or (saturday_closed and sunday_closed) else "확인 필요"
+    if not valid_time:
+        return "확인 필요"
+    if weekend_closed or (saturday_closed and sunday_closed):
+        return "확인 필요"
+    if sunday_closed:
+        return "토요일만 운영"
+    if saturday_closed:
+        return "일요일만 운영"
+    return "주말 운영"
+
+
+def district_of(row: dict[str, str]) -> str:
+    address = (row.get("소재지도로명주소") or row.get("소재지지번주소") or "").strip()
+    parts = address.split()
+    return parts[1] if len(parts) > 1 else ""
+
+
+def completeness_score(values: dict[str, object]) -> int:
+    blocks = [
+        bool(values.get("address") and values.get("mapValid")),
+        bool(values.get("weekdayStart") and values.get("weekendStatus") != "확인 필요"),
+        bool(values.get("feeSufficient")),
+        bool(values.get("application")),
+        bool(isinstance(values.get("capacity"), (int, float)) and values.get("capacity", 0) > 0),
+        bool(values.get("phone") or values.get("website")),
+    ]
+    return round(sum(blocks) / len(blocks) * 100)
+
+
+def row_signature(row: dict[str, str]) -> str:
+    """Return a deterministic fingerprint input without relying on row order."""
+    return "\x1f".join(
+        f"{key}={clean_text(row.get(key))}" for key in sorted(row)
+    )
+
+
+def stable_id(signature: str, occurrence: int) -> str:
+    # One pair in the source is byte-for-byte identical. An occurrence suffix
+    # keeps both source rows addressable while the ID set remains deterministic.
+    identity = signature if occurrence == 1 else f"{signature}\x1eduplicate={occurrence}"
+    return hashlib.sha1(identity.encode("utf-8")).hexdigest()[:14]
+
+
+def fee_details(paid: bool, raw: str) -> tuple[str, float | None]:
+    if not paid:
+        numeric = parse_number(raw)
+        return ("무료 표기 모순", numeric) if numeric and numeric > 0 else ("무료", numeric)
+    if not raw:
+        return "유료·금액 미입력", None
+    if re.fullmatch(r"[0-9][0-9,]*(?:\.[0-9]+)?원?", raw):
+        return "유료·단일 금액", parse_number(raw.replace("원", ""))
+    if "무료" in raw:
+        return "유료·조건부 무료", None
+    if re.search(r"[0-9]", raw):
+        return "유료·조건별 금액", None
+    return "유료·금액 미입력", None
 
 
 def median(values: list[float]) -> float | None:
@@ -79,37 +195,98 @@ def main() -> None:
         raw_rows = list(csv.DictReader(handle))
 
     facilities: list[dict[str, object]] = []
+    signature_occurrences: Counter[str] = Counter()
     for index, row in enumerate(raw_rows, start=1):
-        raw_type = (row.get("개방시설유형구분") or "기타").strip() or "기타"
+        signature = row_signature(row)
+        signature_occurrences[signature] += 1
+        raw_type = clean_text(row.get("개방시설유형구분")) or "기타"
+        normalized_type = normalize_type(raw_type)
+        name = clean_text(row.get("개방시설명")) or "명칭 없음"
+        place = clean_text(row.get("개방장소명"))
+        amenities = clean_text(row.get("부대시설정보"))
+        category, category_basis = category_of(raw_type, f"{name} {place} {amenities}")
+        weekday_start = (row.get("평일운영시작시각") or "").strip()
+        weekday_end = (row.get("평일운영종료시각") or "").strip()
         weekend_start = (row.get("주말운영시작시각") or "").strip()
         weekend_end = (row.get("주말운영종료시각") or "").strip()
-        application = (row.get("신청방법구분") or "").strip()
-        facility = {
-            "id": index,
-            "name": (row.get("개방시설명") or "명칭 없음").strip(),
-            "place": (row.get("개방장소명") or "").strip(),
-            "rawType": raw_type,
-            "category": category_of(raw_type),
-            "region": region_of(row),
-            "paid": (row.get("유료사용여부") or "").strip().upper() == "Y",
-            "fee": parse_number(row.get("사용료", "")),
-            "capacity": parse_number(row.get("수용가능인원수", "")),
-            "area": parse_number(row.get("면적", "")),
-            "application": application,
-            "online": bool(re.search(r"인터넷|온라인|홈페이지|예약시스템|공공서비스예약", application)),
-            "weekday": f"{row.get('평일운영시작시각', '').strip()}–{row.get('평일운영종료시각', '').strip()}",
-            "weekend": f"{weekend_start}–{weekend_end}",
-            "weekendOpen": bool(weekend_start and weekend_end and (weekend_start, weekend_end) != ("00:00", "00:00")),
-            "alwaysOpen": "연중무휴" in (row.get("휴관일") or ""),
-            "closed": (row.get("휴관일") or "").strip(),
+        application = clean_text(row.get("신청방법구분"))
+        channels = application_channels(application)
+        closed = clean_text(row.get("휴관일"))
+        paid = (row.get("유료사용여부") or "").strip().upper() == "Y"
+        fee_raw = clean_text(row.get("사용료"))
+        fee_status, fee = fee_details(paid, fee_raw)
+        usage_duration = parse_number(row.get("사용기준시간", ""))
+        fee_per_hour = (
+            round(fee / usage_duration)
+            if paid and fee and usage_duration and 0 < usage_duration <= 24
+            else None
+        )
+        latitude = parse_number(row.get("위도", ""))
+        longitude = parse_number(row.get("경도", ""))
+        map_valid = bool(
+            latitude is not None and longitude is not None
+            and 32 <= latitude <= 39.5 and 123 <= longitude <= 132
+        )
+        weekend_state = weekend_status(weekend_start, weekend_end, closed)
+        base_values: dict[str, object] = {
             "address": (row.get("소재지도로명주소") or row.get("소재지지번주소") or "").strip(),
             "management": (row.get("관리기관명") or "").strip(),
             "phone": (row.get("사용안내전화번호") or "").strip(),
-            "website": (row.get("홈페이지주소") or "").strip(),
+            "application": application,
+            "capacity": parse_number(row.get("수용가능인원수", "")),
             "date": (row.get("데이터기준일자") or "").strip(),
-            "lat": parse_number(row.get("위도", "")),
-            "lng": parse_number(row.get("경도", "")),
+            "weekdayStart": weekday_start,
+            "weekendStart": weekend_start if (weekend_start, weekend_end) != ("00:00", "00:00") else "",
+            "website": (row.get("홈페이지주소") or "").strip(),
+            "fee": fee,
+            "mapValid": map_valid,
+            "weekendStatus": weekend_state,
+            "feeSufficient": fee_status not in {"유료·금액 미입력", "무료 표기 모순"},
         }
+        facility: dict[str, object] = {
+            "id": stable_id(signature, signature_occurrences[signature]),
+            "sourceRow": index,
+            "name": name,
+            "place": place,
+            "rawType": raw_type,
+            "normalizedType": normalized_type,
+            "category": category,
+            "categoryBasis": category_basis,
+            "region": region_of(row),
+            "district": district_of(row),
+            "paid": paid,
+            "fee": fee,
+            "feeRaw": fee_raw,
+            "feeStatus": fee_status,
+            "usageDuration": usage_duration,
+            "feePerHour": fee_per_hour,
+            "overtimeDuration": parse_number(row.get("초과사용단위시간", "")),
+            "overtimeFee": parse_number(row.get("초과사용료", "")),
+            "capacity": base_values["capacity"],
+            "area": parse_number(row.get("면적", "")),
+            "amenities": amenities,
+            "application": application,
+            "channels": channels,
+            "online": "온라인" in channels,
+            "weekday": f"{weekday_start}–{weekday_end}",
+            "weekend": f"{weekend_start}–{weekend_end}",
+            "weekendStatus": weekend_state,
+            "weekendOpen": weekend_state in {"주말 운영", "토요일만 운영", "일요일만 운영"},
+            "alwaysOpen": "연중무휴" in closed,
+            "closed": closed,
+            "address": base_values["address"],
+            "management": base_values["management"],
+            "provider": (row.get("제공기관명") or "").strip(),
+            "department": (row.get("담당부서명") or "").strip(),
+            "phone": base_values["phone"],
+            "website": base_values["website"],
+            "photo": (row.get("시설사진정보") or "").strip(),
+            "date": base_values["date"],
+            "lat": latitude,
+            "lng": longitude,
+            "mapValid": map_valid,
+        }
+        facility["completeness"] = completeness_score(base_values)
         facilities.append(facility)
 
     total = len(facilities)
@@ -136,10 +313,12 @@ def main() -> None:
         "categoryCounts": [{"name": name, "value": category_counts.get(name, 0)} for name in CATEGORY_ORDER],
         "regions": REGIONS,
         "categories": CATEGORY_ORDER,
+        "channels": CHANNEL_ORDER,
         "notes": {
             "unknownFee": sum(item["fee"] is None for item in facilities),
             "unknownCapacity": sum(item["capacity"] is None for item in facilities),
             "genericType": type_counts.get("기타", 0),
+            "invalidCoordinates": sum(not bool(item["mapValid"]) for item in facilities),
         },
     }
 

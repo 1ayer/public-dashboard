@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="전국 공공시설 개방 표준데이터를 지역과 시설 유형별로 탐색하는 대시보드" />
+    <meta name="description" content="전국 공공시설 7,255개를 지도와 조건 검색으로 탐색하고 비교하는 대시보드" />
     <meta name="theme-color" content="#102a43" />
     <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
     <title>전국 공공시설 개방 현황</title>
@@ -11,98 +11,109 @@
   <body>
     <a class="skip-link" href="#main">본문으로 바로가기</a>
     <header class="topbar">
-      <div class="brand">
+      <a class="brand" href="./" aria-label="공공시설 데이터뷰 홈">
         <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
-        <div>
-          <strong>공공시설 데이터뷰</strong>
-          <span>전국 개방정보 표준데이터</span>
-        </div>
-      </div>
+        <span class="brand-copy"><strong>공공시설 데이터뷰</strong><small>전국 개방정보 표준데이터</small></span>
+      </a>
+      <nav aria-label="주요 영역"><a href="#map-explorer">지도</a><a href="#analysis">분석</a><a href="#facility-explorer">시설 목록</a></nav>
       <div class="source-date"><span>최신 기준일</span><strong id="latest-date">—</strong></div>
     </header>
 
     <main id="main" class="dashboard">
       <section class="intro" aria-labelledby="page-title">
-        <div>
-          <p class="eyebrow">NATIONAL OPEN FACILITIES</p>
-          <h1 id="page-title">전국 공공시설 개방 현황</h1>
-          <p>지역별 공급 규모와 시설 구성, 이용 조건을 비교하고 개별 시설 정보를 찾아보세요.</p>
+        <div><p class="eyebrow">NATIONAL OPEN FACILITIES</p><h1 id="page-title">전국 공공시설 개방 현황</h1><p>원하는 조건의 시설을 지도에서 찾고, 이용 정보와 데이터 신뢰도를 함께 비교하세요.</p></div>
+        <div class="dataset-badge"><span id="recent-rate">—</span><small>최근 1년 이내 갱신 데이터</small></div>
+      </section>
+
+      <section class="filter-panel" aria-label="시설 검색 조건">
+        <div class="filter-primary">
+          <label><span>시·도</span><select id="region-filter"><option value="전체">전국</option></select></label>
+          <label><span>시·군·구</span><select id="district-filter" disabled><option value="전체">전체 시·군·구</option></select></label>
+          <label><span>시설 분류</span><select id="category-filter"><option value="전체">전체 분류</option></select></label>
+          <label class="search-field"><span>시설 검색</span><input id="search-input" type="search" placeholder="시설명·주소·관리기관·부대시설" autocomplete="off" /></label>
         </div>
-        <div class="dataset-badge"><span id="recent-rate">—</span><small>2025년 이후 갱신 데이터 비중</small></div>
+
+        <details class="advanced-filters">
+          <summary>상세 조건 <span id="advanced-count" class="count-badge" hidden>0</span></summary>
+          <div class="advanced-grid">
+            <label><span>요금</span><select id="fee-filter"><option>전체</option><option>무료</option><option>유료·단일 금액</option><option>유료·조건별 금액</option><option>유료·금액 미입력</option><option>유료·조건부 무료</option><option>무료 표기 모순</option></select></label>
+            <label><span>주말 운영</span><select id="weekend-filter"><option>전체</option><option>주말 운영</option><option>토요일만 운영</option><option>일요일만 운영</option><option>휴무</option><option>확인 필요</option></select></label>
+            <label><span>신청 방법</span><select id="channel-filter"><option>전체</option><option>온라인</option><option>전화</option><option>방문</option><option>팩스</option><option>상시개방</option><option>서면·공문</option><option>이메일</option><option>모바일</option><option>키오스크</option><option>추첨</option><option>기타 문의</option></select></label>
+            <label><span>수용인원</span><select id="capacity-filter"><option>전체</option><option>10명 이하</option><option>11~30명</option><option>31~100명</option><option>101명 이상</option><option>미입력</option></select></label>
+            <label><span>데이터 최신성</span><select id="freshness-filter"><option>전체</option><option>최신</option><option>확인 권장</option><option>오래된 정보</option><option>확인 필요</option></select></label>
+            <label><span>정보 완성도</span><select id="completeness-filter"><option>전체</option><option>정보 충분</option><option>일부 누락</option><option>확인 필요</option></select></label>
+            <label class="check-filter"><input id="contact-filter" type="checkbox" /><span>전화 또는 홈페이지가 있는 시설만</span></label>
+          </div>
+        </details>
+
+        <div class="filter-footer">
+          <div id="active-filters" class="active-filters" aria-label="적용된 조건"></div>
+          <div class="filter-actions">
+            <button id="share-button" class="button button-secondary" type="button">링크 공유</button>
+            <button id="csv-button" class="button button-secondary" type="button">CSV 내려받기</button>
+            <button id="print-button" class="button button-secondary" type="button">인쇄</button>
+            <button id="reset-button" class="button button-ghost" type="button">전체 초기화</button>
+          </div>
+        </div>
       </section>
 
-      <section class="filter-panel" aria-label="데이터 필터">
-        <label>
-          <span>지역</span>
-          <select id="region-filter"><option value="전체">전국</option></select>
-        </label>
-        <label>
-          <span>시설 분류</span>
-          <select id="category-filter"><option value="전체">전체 분류</option></select>
-        </label>
-        <label class="search-field">
-          <span>시설 검색</span>
-          <input id="search-input" type="search" placeholder="시설명·주소·관리기관" autocomplete="off" />
-        </label>
-        <button id="reset-button" type="button">필터 초기화</button>
+      <section class="kpi-grid" aria-label="선택 조건 핵심 지표">
+        <article class="kpi kpi-primary"><span>검색된 시설</span><strong id="kpi-total">—</strong><small id="kpi-scope">전국 기준</small></article>
+        <article class="kpi"><span>무료 시설</span><strong id="kpi-free">—</strong><small>유료사용여부가 N인 시설</small></article>
+        <article class="kpi"><span>주말 이용 가능</span><strong id="kpi-weekend">—</strong><small>토요일 또는 일요일 운영으로 정규화된 시설</small></article>
+        <article class="kpi"><span>온라인 신청 가능</span><strong id="kpi-online">—</strong><small>신청방법 정규화 결과</small></article>
       </section>
 
-      <section class="kpi-grid" aria-label="핵심 지표">
-        <article class="kpi kpi-primary"><span>개방 시설</span><strong id="kpi-total">—</strong><small id="kpi-scope">전국 기준</small></article>
-        <article class="kpi"><span>유료 시설 비율</span><strong id="kpi-paid">—</strong><small>유료사용여부 기준</small></article>
-        <article class="kpi"><span>주말 운영 비율</span><strong id="kpi-weekend">—</strong><small>주말 시간이 00:00–00:00이 아닌 시설</small></article>
-        <article class="kpi"><span>온라인 신청 가능</span><strong id="kpi-online">—</strong><small>신청방법에 온라인·인터넷 포함</small></article>
+      <section id="map-explorer" class="panel map-panel" aria-labelledby="map-title">
+        <div class="panel-heading map-heading">
+          <div><p class="section-kicker">MAP EXPLORER</p><h2 id="map-title">지도에서 시설 찾기</h2><p id="map-summary" class="panel-description" aria-live="polite">시설 위치를 준비하고 있습니다.</p></div>
+          <div class="map-actions"><button id="locate-button" class="button button-secondary" type="button">내 위치 주변</button><a class="skip-map" href="#facility-explorer">지도 건너뛰기</a></div>
+        </div>
+        <div class="map-layout">
+          <div class="map-stage"><div id="map" aria-label="공공시설 위치 지도"></div><div id="map-warning" class="map-warning" hidden>지도 배경을 불러오지 못했습니다. 목록과 검색 기능은 계속 사용할 수 있습니다.</div></div>
+          <aside class="nearby-panel" aria-labelledby="nearby-title"><div class="nearby-heading"><h3 id="nearby-title">지도 중심 주변</h3><small>지도를 움직이면 갱신됩니다</small></div><div id="nearby-list" class="nearby-list"></div></aside>
+        </div>
+        <div class="map-legend" aria-label="시설 분류 색상"><span><i data-color="meeting"></i>회의·교육</span><span><i data-color="culture"></i>문화·행사</span><span><i data-color="indoor"></i>실내체육</span><span><i data-color="sports"></i>구기·라켓</span><span><i data-color="multi"></i>다목적공간</span><span><i data-color="outdoor"></i>야외·휴양</span><span><i data-color="etc"></i>기타</span></div>
       </section>
 
-      <section class="analysis-grid">
+      <section id="analysis" class="analysis-grid">
         <article class="panel chart-panel">
-          <div class="panel-heading">
-            <div><p class="section-kicker">DISTRIBUTION</p><h2 id="distribution-title">지역별 시설 분포</h2></div>
-            <span id="distribution-unit">시설 수</span>
-          </div>
-          <div id="bar-chart" class="bar-chart" role="img" aria-label="시설 분포 막대그래프"></div>
+          <div class="panel-heading"><div><p class="section-kicker">DISTRIBUTION</p><h2 id="distribution-title">지역별 시설 분포</h2></div><span>시설 수</span></div>
+          <figure><figcaption class="sr-only">검색 조건에 따른 시설 분포</figcaption><div id="bar-chart" class="bar-chart"></div></figure>
         </article>
-
         <article class="panel condition-panel">
-          <div class="panel-heading"><div><p class="section-kicker">ACCESS</p><h2>이용 조건</h2></div></div>
-          <div class="donut-wrap">
-            <div id="paid-donut" class="donut" role="img" aria-label="유료와 무료 시설 비율"><span id="donut-value">—</span><small>유료</small></div>
-            <div class="legend"><p><i class="paid-dot"></i>유료 <strong id="paid-count">—</strong></p><p><i class="free-dot"></i>무료 <strong id="free-count">—</strong></p></div>
-          </div>
-          <dl class="condition-list">
-            <div><dt>연중무휴 표기</dt><dd id="always-rate">—</dd></div>
-            <div><dt>수용인원 중앙값</dt><dd id="capacity-median">—</dd></div>
-            <div><dt>유료 시설 사용료 중앙값</dt><dd id="fee-median">—</dd></div>
-          </dl>
+          <div class="panel-heading"><div><p class="section-kicker">DATA CONFIDENCE</p><h2>이용 조건과 정보 품질</h2></div></div>
+          <div class="donut-wrap"><div id="paid-donut" class="donut" role="img" aria-label="유료 시설 비율"><span id="donut-value">—</span><small>유료</small></div><div class="legend"><p><i class="paid-dot"></i>유료 <strong id="paid-count">—</strong></p><p><i class="free-dot"></i>무료 <strong id="free-count">—</strong></p></div></div>
+          <dl class="condition-list"><div><dt>정보 충분</dt><dd id="complete-rate">—</dd></div><div><dt>수용인원 중앙값</dt><dd id="capacity-median">—</dd></div><div><dt>유료 시설 사용료 중앙값</dt><dd id="fee-median">—</dd></div><div><dt>최신 데이터</dt><dd id="fresh-rate">—</dd></div></dl>
         </article>
       </section>
 
-      <section class="panel explorer-panel">
+      <section id="facility-explorer" class="panel explorer-panel">
         <div class="panel-heading explorer-heading">
-          <div><p class="section-kicker">FACILITY EXPLORER</p><h2>시설 찾아보기</h2><p id="result-summary" class="panel-description">—</p></div>
-          <label class="sort-control"><span>정렬</span><select id="sort-select"><option value="name">시설명순</option><option value="capacity">수용인원 큰순</option><option value="date">최근 갱신순</option></select></label>
+          <div><p class="section-kicker">FACILITY EXPLORER</p><h2 tabindex="-1" id="facility-heading">시설 찾아보기</h2><p id="result-summary" class="panel-description" aria-live="polite">—</p></div>
+          <label class="sort-control"><span>정렬</span><select id="sort-select"><option value="name">시설명순</option><option value="capacity">수용인원 큰순</option><option value="date">최근 갱신순</option><option value="distance" disabled>내 위치 거리순</option></select></label>
         </div>
         <div class="table-wrap">
-          <table>
-            <thead><tr><th>시설</th><th>분류</th><th>이용 조건</th><th>운영 시간</th><th>관리·연락처</th></tr></thead>
-            <tbody id="facility-table"></tbody>
-          </table>
-          <div id="empty-state" class="empty-state" hidden>조건에 맞는 시설이 없습니다. 검색어나 필터를 조정해 보세요.</div>
+          <table><thead><tr><th>시설</th><th>분류·상태</th><th>이용 조건</th><th>운영 시간</th><th>관리·연락처</th><th>선택</th></tr></thead><tbody id="facility-table"></tbody></table>
         </div>
+        <div id="facility-cards" class="facility-cards"></div>
+        <div id="empty-state" class="empty-state" hidden>조건에 맞는 시설이 없습니다. 검색어나 필터를 조정해 보세요.</div>
         <div class="pagination"><button id="prev-page" type="button">이전</button><span id="page-status">—</span><button id="next-page" type="button">다음</button></div>
       </section>
 
       <section class="data-note" aria-labelledby="data-note-title">
         <div><p class="section-kicker">READING THE DATA</p><h2 id="data-note-title">데이터를 읽을 때 참고하세요</h2></div>
-        <ul>
-          <li><strong id="note-generic">—</strong>개 시설은 원자료의 시설 유형이 ‘기타’로 분류되어 있습니다.</li>
-          <li>사용료와 수용인원은 미입력 값이 많아, 중앙값 계산에서는 유효한 값만 사용했습니다.</li>
-          <li>운영시간·요금은 변경될 수 있으므로 실제 이용 전 관리기관에 확인하는 것이 안전합니다.</li>
-        </ul>
+        <ul><li><strong id="note-generic">—</strong>개 시설은 원자료 유형이 ‘기타’이며, 시설명·부대정보를 활용한 분류는 추정으로 표시합니다.</li><li><strong id="note-coordinates">—</strong>개 시설은 좌표 오류로 지도에서 제외되지만 목록에서는 확인할 수 있습니다.</li><li>요금·운영시간은 변경될 수 있으므로 실제 이용 전 관리기관에 확인하는 것이 안전합니다.</li></ul>
       </section>
     </main>
 
-    <footer><p>출처: 전국공공시설개방정보표준데이터 · 화면 집계는 원자료를 정제한 결과입니다.</p></footer>
+    <aside id="compare-tray" class="compare-tray" hidden aria-label="비교할 시설"><div id="compare-items" class="compare-items"></div><div><span id="compare-count">0/4</span><button id="open-compare" class="button button-primary" type="button">선택 시설 비교</button><button id="clear-compare" class="button button-ghost-light" type="button">비우기</button></div></aside>
+
+    <dialog id="detail-dialog" class="detail-dialog"><div class="drawer-shell"><header><div id="detail-badges" class="detail-badges"></div><button class="icon-button" data-close-detail type="button" aria-label="상세 정보 닫기">×</button></header><div id="detail-content" class="detail-content"></div></div></dialog>
+    <dialog id="compare-dialog" class="compare-dialog"><div class="compare-shell"><header><div><p class="section-kicker">COMPARE</p><h2>시설 비교</h2></div><button class="icon-button" data-close-compare type="button" aria-label="비교 창 닫기">×</button></header><div id="compare-content" class="compare-content"></div></div></dialog>
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+    <footer><p>출처: 전국공공시설개방정보표준데이터 · 원자료를 정규화한 탐색용 정보이며 실제 이용 전 관리기관 확인을 권장합니다.</p></footer>
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>
