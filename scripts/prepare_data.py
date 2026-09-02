@@ -47,6 +47,13 @@ CATEGORY_PATTERNS = [
     ("다목적공간", r"다목적|공유|동아리|사랑방|레크레이션|요리스튜디오|주민공간|커뮤니티"),
 ]
 
+# The source contains six Changwon rows whose coordinates form an artificial
+# diagonal into the East Sea (35/128 through 41/134). A generous province box
+# catches that address-coordinate mismatch without excluding border facilities.
+REGION_COORDINATE_BOUNDS = {
+    "경상남도": (34.4, 36.0, 127.3, 129.7),
+}
+
 
 def clean_text(value: str | None) -> str:
     return unicodedata.normalize("NFKC", value or "").strip()
@@ -60,6 +67,18 @@ def parse_number(value: str) -> float | None:
         return float(cleaned)
     except ValueError:
         return None
+
+
+def coordinates_valid(region: str, latitude: float | None, longitude: float | None) -> bool:
+    if latitude is None or longitude is None:
+        return False
+    if not (32 <= latitude <= 39.5 and 123 <= longitude <= 132):
+        return False
+    bounds = REGION_COORDINATE_BOUNDS.get(region)
+    if not bounds:
+        return True
+    min_lat, max_lat, min_lng, max_lng = bounds
+    return min_lat <= latitude <= max_lat and min_lng <= longitude <= max_lng
 
 
 def region_of(row: dict[str, str]) -> str:
@@ -223,10 +242,8 @@ def main() -> None:
         )
         latitude = parse_number(row.get("위도", ""))
         longitude = parse_number(row.get("경도", ""))
-        map_valid = bool(
-            latitude is not None and longitude is not None
-            and 32 <= latitude <= 39.5 and 123 <= longitude <= 132
-        )
+        region = region_of(row)
+        map_valid = coordinates_valid(region, latitude, longitude)
         weekend_state = weekend_status(weekend_start, weekend_end, closed)
         base_values: dict[str, object] = {
             "address": (row.get("소재지도로명주소") or row.get("소재지지번주소") or "").strip(),
@@ -252,7 +269,7 @@ def main() -> None:
             "normalizedType": normalized_type,
             "category": category,
             "categoryBasis": category_basis,
-            "region": region_of(row),
+            "region": region,
             "district": district_of(row),
             "paid": paid,
             "fee": fee,
