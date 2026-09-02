@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="전국 공공시설 개방 표준데이터를 지역과 시설 유형별로 탐색하는 대시보드" />
+    <meta name="theme-color" content="#102a43" />
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+    <title>전국 공공시설 개방 현황</title>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">본문으로 바로가기</a>
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+        <div>
+          <strong>공공시설 데이터뷰</strong>
+          <span>전국 개방정보 표준데이터</span>
+        </div>
+      </div>
+      <div class="source-date"><span>최신 기준일</span><strong id="latest-date">—</strong></div>
+    </header>
+
+    <main id="main" class="dashboard">
+      <section class="intro" aria-labelledby="page-title">
+        <div>
+          <p class="eyebrow">NATIONAL OPEN FACILITIES</p>
+          <h1 id="page-title">전국 공공시설 개방 현황</h1>
+          <p>지역별 공급 규모와 시설 구성, 이용 조건을 비교하고 개별 시설 정보를 찾아보세요.</p>
+        </div>
+        <div class="dataset-badge"><span id="recent-rate">—</span><small>2025년 이후 갱신 데이터 비중</small></div>
+      </section>
+
+      <section class="filter-panel" aria-label="데이터 필터">
+        <label>
+          <span>지역</span>
+          <select id="region-filter"><option value="전체">전국</option></select>
+        </label>
+        <label>
+          <span>시설 분류</span>
+          <select id="category-filter"><option value="전체">전체 분류</option></select>
+        </label>
+        <label class="search-field">
+          <span>시설 검색</span>
+          <input id="search-input" type="search" placeholder="시설명·주소·관리기관" autocomplete="off" />
+        </label>
+        <button id="reset-button" type="button">필터 초기화</button>
+      </section>
+
+      <section class="kpi-grid" aria-label="핵심 지표">
+        <article class="kpi kpi-primary"><span>개방 시설</span><strong id="kpi-total">—</strong><small id="kpi-scope">전국 기준</small></article>
+        <article class="kpi"><span>유료 시설 비율</span><strong id="kpi-paid">—</strong><small>유료사용여부 기준</small></article>
+        <article class="kpi"><span>주말 운영 비율</span><strong id="kpi-weekend">—</strong><small>주말 시간이 00:00–00:00이 아닌 시설</small></article>
+        <article class="kpi"><span>온라인 신청 가능</span><strong id="kpi-online">—</strong><small>신청방법에 온라인·인터넷 포함</small></article>
+      </section>
+
+      <section class="analysis-grid">
+        <article class="panel chart-panel">
+          <div class="panel-heading">
+            <div><p class="section-kicker">DISTRIBUTION</p><h2 id="distribution-title">지역별 시설 분포</h2></div>
+            <span id="distribution-unit">시설 수</span>
+          </div>
+          <div id="bar-chart" class="bar-chart" role="img" aria-label="시설 분포 막대그래프"></div>
+        </article>
+
+        <article class="panel condition-panel">
+          <div class="panel-heading"><div><p class="section-kicker">ACCESS</p><h2>이용 조건</h2></div></div>
+          <div class="donut-wrap">
+            <div id="paid-donut" class="donut" role="img" aria-label="유료와 무료 시설 비율"><span id="donut-value">—</span><small>유료</small></div>
+            <div class="legend"><p><i class="paid-dot"></i>유료 <strong id="paid-count">—</strong></p><p><i class="free-dot"></i>무료 <strong id="free-count">—</strong></p></div>
+          </div>
+          <dl class="condition-list">
+            <div><dt>연중무휴 표기</dt><dd id="always-rate">—</dd></div>
+            <div><dt>수용인원 중앙값</dt><dd id="capacity-median">—</dd></div>
+            <div><dt>유료 시설 사용료 중앙값</dt><dd id="fee-median">—</dd></div>
+          </dl>
+        </article>
+      </section>
+
+      <section class="panel explorer-panel">
+        <div class="panel-heading explorer-heading">
+          <div><p class="section-kicker">FACILITY EXPLORER</p><h2>시설 찾아보기</h2><p id="result-summary" class="panel-description">—</p></div>
+          <label class="sort-control"><span>정렬</span><select id="sort-select"><option value="name">시설명순</option><option value="capacity">수용인원 큰순</option><option value="date">최근 갱신순</option></select></label>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>시설</th><th>분류</th><th>이용 조건</th><th>운영 시간</th><th>관리·연락처</th></tr></thead>
+            <tbody id="facility-table"></tbody>
+          </table>
+          <div id="empty-state" class="empty-state" hidden>조건에 맞는 시설이 없습니다. 검색어나 필터를 조정해 보세요.</div>
+        </div>
+        <div class="pagination"><button id="prev-page" type="button">이전</button><span id="page-status">—</span><button id="next-page" type="button">다음</button></div>
+      </section>
+
+      <section class="data-note" aria-labelledby="data-note-title">
+        <div><p class="section-kicker">READING THE DATA</p><h2 id="data-note-title">데이터를 읽을 때 참고하세요</h2></div>
+        <ul>
+          <li><strong id="note-generic">—</strong>개 시설은 원자료의 시설 유형이 ‘기타’로 분류되어 있습니다.</li>
+          <li>사용료와 수용인원은 미입력 값이 많아, 중앙값 계산에서는 유효한 값만 사용했습니다.</li>
+          <li>운영시간·요금은 변경될 수 있으므로 실제 이용 전 관리기관에 확인하는 것이 안전합니다.</li>
+        </ul>
+      </section>
+    </main>
+
+    <footer><p>출처: 전국공공시설개방정보표준데이터 · 화면 집계는 원자료를 정제한 결과입니다.</p></footer>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
