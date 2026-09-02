@@ -164,7 +164,16 @@ def weekend_status(start: str, end: str, closed: str) -> str:
 def district_of(row: dict[str, str]) -> str:
     address = (row.get("소재지도로명주소") or row.get("소재지지번주소") or "").strip()
     parts = address.split()
-    return parts[1] if len(parts) > 1 else ""
+    for token in parts[1:4]:
+        clean = re.sub(r"[(),]", "", token)
+        if re.search(r"(?:시|군|구)$", clean):
+            return clean
+    if region_of(row) == "세종특별자치시":
+        for token in parts[1:4]:
+            clean = re.sub(r"[(),]", "", token)
+            if re.search(r"(?:읍|면|동)$", clean):
+                return clean
+    return ""
 
 
 def completeness_score(values: dict[str, object]) -> int:
